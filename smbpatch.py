@@ -48,16 +48,17 @@ mario_skin = 0x5E9
 mario_hair = 0x5EA
 
 def patch_colors(rom: bytearray) -> None:
-    rom[water] = 0x14
-    rom[day_sky] = 0x2B
+    pass
+    # rom[water] = 0x14
+    # rom[day_sky] = 0x2B
     # rom[night_sky] = navy = 0x01
-    rom[ow_bushes_dark] = 0x15
-    rom[ow_bushes_bright] = 0x25
+    # rom[ow_bushes_dark] = 0x15
+    # rom[ow_bushes_bright] = 0x25
     # rom[ow_brick_dark] = teal = 0x17
     # rom[ow_brick_bright] = bright_teal = 0x27
 
-    rom[mario_skin] = 0x27
-    rom[mario_hair] = 0x01
+    # rom[mario_skin] = 0x27
+    # rom[mario_hair] = 0x01
 
 ########################################
 # Famitracker parsing.
@@ -85,90 +86,70 @@ class Chunk:
             yield string
             index += len(string) + 1
 
-Song = namedtuple('Song', 'name frames rows_per_frame speed tempo effect_columns')
-
-class Module:
-    "A FamiTracker module."
-
-    def __init__(self, file_object):
-        ftm = bytearray(file_object.read())
-
-        # Check the file signature.
-        if ftm[:22] != b'FamiTracker Module@\4\0\0':
-            raise ValueError('The given file does not describe a FamiTracker module.')
-
-        # Read all the chunks (until we hit the end-of-file marker, "END").
-        self.chunks = {}
-        ptr = 22
-        while True:
-            name = ftm[ptr:ptr+16].decode('ascii').rstrip('\0'); ptr += 16
-            if name == 'END': break
-            version = u32(ftm, ptr); ptr += 4
-            length = u32(ftm, ptr); ptr += 4
-            contents = ftm[ptr:ptr+length]; ptr += length
-            self.chunks[name] = Chunk(name, version, contents)
-
-        # Start extracting info about the module.
-        params = self.chunks['PARAMS']
-        assert params.version == 6
-        self.num_channels = params.u32(0x1)
-
-        # Read song names from the HEADER chunk.
-        header = self.chunks['HEADER']
-        assert header.version == 3
-        num_songs = header.byte(0x0) + 1
-        song_names = []
-        ptr = 0x1
-        for i in range(num_songs):
-            name = header.c_string(ptr).decode('utf-8')
-            song_names.append(name)
-            ptr += len(name) + 1
-
-        # Read channels from the HEADER chunk. This is a list of (identifier, L) tuples
-        # where L is a list such that song i has L[i]+1 effect columns for that channel.
-        channels = []
-        for i in range(self.num_channels):
-            identifier = header.byte(ptr); ptr += 1
-            L = list(header.string(ptr, num_songs)); ptr += len(L)
-            channels.append((identifier, L))
-
-        # Read frame data for each song.
-        frames_chunk = self.chunks['FRAMES']
-        assert frames_chunk.version == 3
-        self.songs = []
-        ptr = 0x0
-        for i in range(num_songs):
-            num_frames = frames_chunk.u32(ptr); ptr += 4
-            speed = frames_chunk.u32(ptr); ptr += 4
-            tempo = frames_chunk.u32(ptr); ptr += 4
-            rows_per_frame = frames_chunk.u32(ptr); ptr += 4
-            frames = []
-            for i in range(num_frames):
-                frame = []
-                for j in range(self.num_channels):
-                    frame.append(frames_chunk.byte(ptr)); ptr += 1
-                frames.append(frame)
-
-            effect_columns = [L[i] + 1 for _, L in channels]
-            song = Song(song_names[i], frames, rows_per_frame, speed, tempo, effect_columns)
-            self.songs.append(song)
-
-        print(self.songs[1])
-
-
-with open('newmario.ftm', 'rb') as f:
-    mod = Module(f)
-
 ########################################
 # Music patches!
 # We use strings like "C-5" or "C#5" to represent notes,
 # strings "4.", "4", "8.", "8", "8t", "16", "16t", "32t" for note duration opcodes,
-# "0" for stop, "." for rest
+# "0" for stop, "x" for rest
 ########################################
 
+'''
+$791D: Mario Dies (A5)
+$791E: Game Over (59)
+$791F: Princess Rescued! (54)
+$7920: Mushroom Retainer Rescued (64)
+$7921: Game Over [alternate] (59) (See quote)
+$7922: Level Complete (3C)
+$7923: Time Running Out! (31)
+$7924: Silence #1 (4B)
+$7925: ????? (69)
+$7926: Underwater Theme (5E)
+$7927: Underground Theme (46)
+$7928: Castle Theme (4F)
+$7929: Cloud Theme (36)
+$792A: Pre-pipe Theme [Used at beginning of 1-2, 2-2, 4-2 and 7-2] (8D)
+$792B: Starman Theme (36)
+$792C: Silence #2 [plays during 'Level X-Y' screen] (4B)
+$792D: Overworld Theme Slot #1 (8D)
+$792E: Overworld Theme Slot #2 (69)
+$792F: Overworld Theme Slot #3 (69)
+$7930: Overworld Theme Slot #4 (6F)
+$7931: Overworld Theme Slot #5 (75)
+$7932: Overworld Theme Slot #6 (6F)
+$7933: Overworld Theme Slot #7 (7B)
+$7934: Overworld Theme Slot #8 (6F)
+$7935: Overworld Theme Slot #9 (75)
+$7936: Overworld Theme Slot #10 (6F)
+$7937: Overworld Theme Slot #11 (7B)
+$7938: Overworld Theme Slot #12 (81)
+$7939: Overworld Theme Slot #13 (87)
+$793A: Overworld Theme Slot #14 (81)
+$793B: Overworld Theme Slot #15 (8D)
+$793C: Overworld Theme Slot #16 (69)
+$793D: Overworld Theme Slot #17 (69)
+$793E: Overworld Theme Slot #18 (93)
+$793F: Overworld Theme Slot #19 (99)
+$7940: Overworld Theme Slot #20 (93)
+$7941: Overworld Theme Slot #21 (9F)
+$7942: Overworld Theme Slot #22 (93)
+$7943: Overworld Theme Slot #23 (99)
+$7944: Overworld Theme Slot #24 (93)
+$7945: Overworld Theme Slot #25 (9F)
+$7946: Overworld Theme Slot #26 (81)
+$7947: Overworld Theme Slot #27 (87)
+$7948: Overworld Theme Slot #28 (81)
+$7949: Overworld Theme Slot #29 (8D)
+$794A: Overworld Theme Slot #30 (93)
+$794B: Overworld Theme Slot #31 (99)
+$794C: Overworld Theme Slot #32 (93)
+$794D: Overworld Theme Slot #33 (9F)
+'''
+
 song_table = 0x791D
+
 song_table_size = 49
 overworld_pattern_list = 0x792D
+underground_song = 0x7927
 song_headers = song_table + song_table_size
 music_data = 0x79C8 # Adjust as needed.
 music_data_size = 1352
@@ -186,7 +167,7 @@ melody_to_byte = {
     'A-3': 0x26, 'Ab3': 0x24, 'G#3': 0x24, 'G-3': 0x22, 'Gb3': 0x20, 'F#3': 0x20, 'F-3': 0x1E, 'E-3': 0x1C, 'Eb3': 0x1A,
     'D#3': 0x1A, 'D-3': 0x18, 'C#3': 0x16, 'C-3': 0x14, 'B-2': 0x12, 'Bb2': 0x10, 'A#2': 0x10, 'A-2': 0x62, 'Ab2': 0x0E,
     'G#2': 0x0E, 'G-2': 0x0C, 'Gb2': 0x0A, 'F#2': 0x0A, 'F-2': 0x08, 'E-2': 0x06, 'Eb2': 0x60, 'D#2': 0x60, 'D-2': 0x5E,
-    'C-2': 0x5C, 'G-2': 0x5A, 'x': 0x04, '0': 0x00,
+    'C-2': 0x5C, 'G-1': 0x5A, '...': 0x04, '---': 0x00,
 }
 
 harmony_to_byte = {
@@ -237,7 +218,7 @@ harmony_to_byte = {
     'q.F#2': 0x0A, 'qF#2': 0x8B, 'i.F#2': 0x4B, 'iF#2': 0x0B, 'itF#2': 0xCB, 'sF#2': 0x8A, 'stF#2': 0xCA, 'zF#2': 0x4A,
     'q.F-2': 0x08, 'qF-2': 0x89, 'i.F-2': 0x49, 'iF-2': 0x09, 'itF-2': 0xC9, 'sF-2': 0x88, 'stF-2': 0xC8, 'zF-2': 0x48,
     'q.E-2': 0x06, 'qE-2': 0x87, 'i.E-2': 0x47, 'iE-2': 0x07, 'itE-2': 0xC7, 'sE-2': 0x86, 'stE-2': 0xC6, 'zE-2': 0x46,
-    'q.x':   0x04, 'qx':   0x85, 'i.x':   0x45, 'ix':   0x05, 'itx':   0xC5, 'sx':   0x84, 'stx':   0xC4, 'zx':   0x44,
+    'q....': 0x04, 'q...': 0x85, 'i....': 0x45, 'i...': 0x05, 'it...': 0xC5, 's...': 0x84, 'st...': 0xC4, 'z...': 0x44,
     'q.D-6': 0x02, 'qD-6': 0x83, 'i.D-6': 0x43, 'iD-6': 0x03, 'itD-6': 0xC3, 'sD-6': 0x82, 'stD-6': 0xC2, 'zD-6': 0x42,
 
     '0': 0x00,
@@ -305,6 +286,41 @@ class Music:
         print('Use as %02x in the song table.' % (addr - song_table))
         return addr - song_table
 
+    def rows_to_bytes(self, rows: list, is_melodic: bool) -> bytes:
+        notes = [r.split()[0] for r in rows]
+        rle = [['...', 0]]
+        for n in notes:
+            if n == '...':
+                if rle[-1][1] == 4: rle.append(['...', 1])
+                else: rle[-1][1] += 1
+            else: rle.append([n, 1])
+        rle = [[x,y] for [x,y] in rle if y]
+        bs = []
+        now_l = -1
+        print(rle)
+        for [n,l] in rle:
+            # 'q.': 0x80, 'q': 0x86, 'i.': 0x85, 'i': 0x84, 'it': 0x87, 's': 0x82, 'st': 0x83, 'z': 0x81,
+            if l != now_l:
+                now_l = l
+                if is_melodic: bs.append([None, 0x82, 0x84, 0x85, 0x86, None, 0x80][l])
+            if is_melodic: bs.append(melody_to_byte[n])
+            else: bs.append(harmony_to_byte[ [None, 's', 'i', 'i.', 'q', None, 'q.'][l]+n ])
+        return bytes(bs)
+
+    def song_from_pattern(self, name: str, speed: int, pattern: dict) -> int:
+        len = 0
+        while len < 64:
+            len += 1
+            if any(v[len-1].endswith('D00') for v in pattern.values()): break
+        mel_rows = pattern[1][:len]
+        mel_bytes = self.rows_to_bytes(mel_rows, True)
+        harm_rows = pattern[0][:len]
+        harm_bytes = self.rows_to_bytes(harm_rows, False)
+        bass_rows = pattern[2][:len]
+        bass_bytes = self.rows_to_bytes(bass_rows, True)
+
+        return self.song(name, speed, mel_bytes, harm_bytes, bass_bytes, b'')
+
     def clear(self) -> None:
         silence = self.song('Silence', 0x18, b'\4', b'\4', b'\4', b'\4')
         # Point everything towards silence.
@@ -312,54 +328,35 @@ class Music:
 
     def write_new_music(self) -> None:
         # Overworld music!
+        # Dict: trk -> pat -> col -> list of notes
+        tracks = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        tn = None
+        pi = None
+        with open('newmario.txt', 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('TRACK'):
+                    tn = line.split()[-1][1:-1]
+                elif line.startswith('PATTERN'):
+                    pi = int(line.split()[-1])
+                elif line.startswith('ROW'):
+                    for ci, x in enumerate(line.split(' : ')[1:]):
+                        tracks[tn][pi][ci].append(x)
+        print(tracks['overworld'][0][0])
+
         ow = overworld_pattern_list
         self.rom[ow] = \
-            self.song('Overworld Intro', bpm150,
-                melody('q E-4 F-4 G-4'),
-                harmony('qC-4 qD-4 qE-4'),
-                bass('q G-3 A-3 C-4'),
-                noise('qK qK qO'))
-
-        self.rom[ow+1] = self.rom[ow+2] = self.rom[ow+3] = self.rom[ow+4] = \
-            self.song('Overworld Main', bpm150,
-                melody('q. Bb4 i G-4 x Bb4 q A-4 G-4 F-4 q. G-4 i E-4 x F-4 q E-4 D-4 C-4'),
-                harmony('q.G-4 q.E-4 qF-4 qE-4 qD-4 q.C-4 q.G-3 q.Bb3 q.G-3'),
-                bass('q. Bb3 F-4 A-3 E-4 G-3 C-4 i Bb3 C-4 Bb3 A-3 Bb3 C-4'),
-                noise('qK iC qO iC iK iK iO iK qC'))
-        print(self.rom[ow])
-
+            self.song_from_pattern('Overworld Intro', bpm150, tracks['overworld'][0])
+        owA = self.song_from_pattern('Overworld A', bpm150, tracks['overworld'][1])
+        owB = self.song_from_pattern('Overworld B', bpm150, tracks['overworld'][2])
+        self.rom[ow+1] = self.rom[ow+3] = self.rom[ow+5] = owA
+        self.rom[ow+2] = self.rom[ow+4] = self.rom[ow+6] = owB
+        self.rom[underground_song] = \
+            self.song_from_pattern('Underground', bpm150, tracks['underground'][0])
 
     def patch(self):
         self.clear()
         self.write_new_music()
-
-# def patch_overworld_music(rom: bytearray) -> None:
-#     intro_pattern = rom[overworld_pattern_list + 0]
-#     intro_header = song_table + intro_pattern
-#     sp, lo, hi, tr, s1, ns = rom[intro_header : intro_header+6]
-#     # print([hex(x) for x in [sp,lo,hi,tr,s1,ns]])
-#
-#     ima = intro_melody_address = cpu_to_rom(256*hi + lo)
-#     iba = intro_bass_address = ima + tr
-#     iha = intro_harmony_address = ima + s1
-#     ina = intro_noise_address = ima + ns
-#     print(ima, iba, iha, ina)
-#
-#     i = ima = intro_melody_address
-#     while rom[i] != 0: print(byte_to_melody[rom[i]], end=' '); i += 1
-#     print()
-#
-#     i = iba
-#     while i != ina: print(byte_to_melody[rom[i]], end=' '); i += 1
-#     print()
-#
-#     i = iha
-#     while i != iba: print(byte_to_harmony[rom[i]], end=' '); i += 1
-#     print()
-#
-#     write(rom, ima, 12, melody('s F-4 i E-4 D-4 s C-4 i A-3 q A-4 G-4'))
-#     write(rom, iha, 1, harmony('sF-3'))
-#     write(rom, ina, 3, harmony('qK qC qO'))
 
 def patch_music(rom: bytearray) -> None:
     Music(rom).patch()
